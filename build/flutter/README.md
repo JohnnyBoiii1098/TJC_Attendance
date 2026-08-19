@@ -1,4 +1,4 @@
-# TJC Attendance
+# TJC_Attendance
 
 
 
@@ -7,7 +7,7 @@
 * `tjc_attendance` - project identifier (lowercase, no spaces, i.e. "snake_case") used for bundle IDs and package names.
 * `` - project description.
 * `TJC_Attendance` - executable or bundle name on disk.
-* `TJC Attendance` - display name shown in window titles and about app dialogs.
+* `TJC_Attendance` - display name shown in window titles and about app dialogs.
 * `com.flet` - org name in reverse domain name notation, e.g. `com.mycompany.myproject`.
 * `Your Company` - the name of the company.
 * `Copyright (c) 2026 Your Company` - the copyright notice.

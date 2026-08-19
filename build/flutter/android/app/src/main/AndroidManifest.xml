@@ -12,7 +12,7 @@
 
     <!--  -->
     <application
-        android:label="TJC Attendance"
+        android:label="TJC_Attendance"
         android:name="${applicationName}"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher">

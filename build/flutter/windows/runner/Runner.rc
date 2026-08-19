@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "Your Company" "\0"
-            VALUE "FileDescription", "TJC Attendance" "\0"
+            VALUE "FileDescription", "TJC_Attendance" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "TJC_Attendance" "\0"
             VALUE "LegalCopyright", "Copyright (c) 2026 Your Company" "\0"
             VALUE "OriginalFilename", "TJC_Attendance.exe" "\0"
-            VALUE "ProductName", "TJC Attendance" "\0"
+            VALUE "ProductName", "TJC_Attendance" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
