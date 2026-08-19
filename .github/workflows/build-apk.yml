@@ -37,7 +37,7 @@ jobs:
         pip install flet
 
     - name: Rename script for Flet
-      run: mv TJC_Attendance.py main.py
+      run: main.py
 
     # FIX: Changed --project-name to the correct --project flag
     - name: Build Android APK
