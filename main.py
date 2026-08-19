@@ -1,21 +1,20 @@
 import flet as ft
-import pg8000.dbapi  # Swapped from psycopg2
+import psycopg2
 import math
 import datetime
 import os
 
 # --- Database Configuration ---
 DB_CONFIG = {
-    "host": "192.168.1.X",  # Replace with your laptop's exact IPv4 address!
+    "host": "127.0.0.1",
     "port": 5432,
-    "database": "TJC",      # pg8000 uses 'database', not 'dbname'
+    "dbname": "TJC",
     "user": "postgres",
     "password": "Nevve80085"
 }
 
 def get_db_connection():
-    return pg8000.dbapi.connect(**DB_CONFIG)
-
+    return psycopg2.connect(**DB_CONFIG)
 
 def solid_border(width_val, color_val):
     return ft.Border(
@@ -25,14 +24,14 @@ def solid_border(width_val, color_val):
         right=ft.BorderSide(width_val, color_val)
     )
 
-
 def main(page: ft.Page):
-    # --- Page Alignment & Setup ---
+    # --- Page Alignment & Responsive Setup ---
     page.title = "TJC Attendance"
     page.bgcolor = "#f3f4f6"
     page.padding = 0
     page.theme_mode = ft.ThemeMode.LIGHT
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.scroll = ft.ScrollMode.AUTO  
 
     block_radius = 8
     categories = ["Alto", "Bass", "Soprano", "Tenor", "Band", "Conductors"]
@@ -42,23 +41,22 @@ def main(page: ft.Page):
         page.snack_bar.open = True
         page.update()
 
-    def card_container(card_content, card_width=None):
+    def card_container(card_content):
         return ft.Container(
             content=card_content,
             bgcolor="white",
-            padding=25,
+            padding=20,
             border_radius=block_radius,
-            width=card_width,
             border=solid_border(1, "#e5e7eb"),
-            shadow=ft.BoxShadow(blur_radius=15, spread_radius=2, color="#00000010", offset=ft.Offset(0, 4))
+            shadow=ft.BoxShadow(blur_radius=15, spread_radius=2, color="#00000010", offset=ft.Offset(0, 4)),
+            expand=True 
         )
 
     content_container = ft.Container(expand=True)
 
     main_wrapper = ft.Container(
         content=content_container,
-        width=1100,
-        padding=25,
+        padding=15,
         alignment=ft.Alignment(0, -1),
         expand=True
     )
@@ -83,7 +81,7 @@ def main(page: ft.Page):
                 content=ft.Text("TJC", weight=ft.FontWeight.BOLD, color="#D4AF37", size=18),
                 bgcolor="#001f3f", padding=10, border_radius=block_radius
             ),
-            ft.Text("Attendance Portal", weight=ft.FontWeight.BOLD, color="#ffffff", size=18)
+            ft.Text("Attendance Portal", weight=ft.FontWeight.BOLD, color="#ffffff", size=16)
         ], alignment=ft.MainAxisAlignment.START),
         bgcolor="#001f3f",
         center_title=False,
@@ -92,7 +90,7 @@ def main(page: ft.Page):
             ft.IconButton(
                 icon=ft.Icons.HOME,
                 icon_color="white",
-                icon_size=20,
+                icon_size=24,
                 tooltip="Home",
                 on_click=lambda event_arg: navigate(event_arg, "home")
             )
@@ -106,53 +104,45 @@ def main(page: ft.Page):
     # ==========================================
     def build_home_view():
         return ft.Column([
-            ft.Divider(height=50, color="transparent"),
-            ft.Text("The Josephite Choir", size=40, weight=ft.FontWeight.BOLD, color="#1f2937"),
-            ft.Text("For The Greater Glory Of God", size=18, italic=True, color="#6b7280"),
-            ft.Divider(height=40, color="transparent"),
-            ft.Row([
-                card_container(ft.Column([
-                    ft.Icon(ft.Icons.PERSON_ADD, size=40, color="#2563eb"),
-                    ft.Text("Add Student", weight=ft.FontWeight.BOLD, size=16),
-                    ft.Button(content=ft.Text("Open"), on_click=lambda event_arg: navigate(event_arg, "add"),
-                              bgcolor="#2563eb", color="white")
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                    card_width=200),
-
-                card_container(ft.Column([
-                    ft.Icon(ft.Icons.CHECK_CIRCLE, size=40, color="#16a34a"),
-                    ft.Text("Mark Attendance", weight=ft.FontWeight.BOLD, size=16),
-                    ft.Button(content=ft.Text("Open"), on_click=lambda event_arg: navigate(event_arg, "mark"),
-                              bgcolor="#16a34a", color="white")
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                    card_width=200),
-
-                card_container(ft.Column([
-                    ft.Icon(ft.Icons.CALENDAR_MONTH, size=40, color="#9333ea"),
-                    ft.Text("Day Viewer & Print", weight=ft.FontWeight.BOLD, size=16),
-                    ft.Button(content=ft.Text("Open"), on_click=lambda event_arg: navigate(event_arg, "viewer"),
-                              bgcolor="#9333ea", color="white")
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                    card_width=200),
-
-                card_container(ft.Column([
-                    ft.Icon(ft.Icons.CALCULATE, size=40, color="#ca8a04"),
-                    ft.Text("Credits Calculator", weight=ft.FontWeight.BOLD, size=16),
-                    ft.Button(content=ft.Text("Open"), on_click=lambda event_arg: navigate(event_arg, "credits"),
-                              bgcolor="#ca8a04", color="white")
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                    card_width=200),
-            ], alignment=ft.MainAxisAlignment.CENTER, spacing=30, wrap=True)
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True)
+            ft.Divider(height=20, color="transparent"),
+            ft.Text("The Josephite Choir", size=32, weight=ft.FontWeight.BOLD, color="#1f2937", text_align=ft.TextAlign.CENTER),
+            ft.Text("For The Greater Glory Of God", size=16, italic=True, color="#6b7280", text_align=ft.TextAlign.CENTER),
+            ft.Divider(height=30, color="transparent"),
+            
+            ft.ResponsiveRow([
+                ft.Container(card_container(ft.Column([
+                    ft.Icon(ft.Icons.PERSON_ADD, size=35, color="#2563eb"),
+                    ft.Text("Add Student", weight=ft.FontWeight.BOLD, size=15),
+                    ft.Button(content=ft.Text("Open"), on_click=lambda event_arg: navigate(event_arg, "add"), bgcolor="#2563eb", color="white")
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER)), col={"sm": 6, "xs": 12}),
+                
+                ft.Container(card_container(ft.Column([
+                    ft.Icon(ft.Icons.CHECK_CIRCLE, size=35, color="#16a34a"),
+                    ft.Text("Mark Attendance", weight=ft.FontWeight.BOLD, size=15),
+                    ft.Button(content=ft.Text("Open"), on_click=lambda event_arg: navigate(event_arg, "mark"), bgcolor="#16a34a", color="white")
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER)), col={"sm": 6, "xs": 12}),
+                
+                ft.Container(card_container(ft.Column([
+                    ft.Icon(ft.Icons.CALENDAR_MONTH, size=35, color="#9333ea"),
+                    ft.Text("Day Viewer & Print", weight=ft.FontWeight.BOLD, size=15),
+                    ft.Button(content=ft.Text("Open"), on_click=lambda event_arg: navigate(event_arg, "viewer"), bgcolor="#9333ea", color="white")
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER)), col={"sm": 6, "xs": 12}),
+                
+                ft.Container(card_container(ft.Column([
+                    ft.Icon(ft.Icons.CALCULATE, size=35, color="#ca8a04"),
+                    ft.Text("Credits Calculator", weight=ft.FontWeight.BOLD, size=15),
+                    ft.Button(content=ft.Text("Open"), on_click=lambda event_arg: navigate(event_arg, "credits"), bgcolor="#ca8a04", color="white")
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER)), col={"sm": 6, "xs": 12}),
+            ], spacing=20)
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     # ==========================================
     # PAGE 2: ADD STUDENT
     # ==========================================
     def build_add_view():
-        student_name = ft.TextField(label="Full Name", border_radius=block_radius, width=300)
-        reg_no = ft.TextField(label="Registration ID", border_radius=block_radius, width=300)
-        part = ft.Dropdown(label="Select Category", options=[ft.DropdownOption(c) for c in categories],
-                           border_radius=block_radius, width=300)
+        student_name = ft.TextField(label="Full Name", border_radius=block_radius, expand=True)
+        reg_no = ft.TextField(label="Registration ID", border_radius=block_radius, expand=True)
+        part = ft.Dropdown(label="Select Category", options=[ft.DropdownOption(c) for c in categories], border_radius=block_radius, expand=True)
 
         def on_register(_):
             if not student_name.value or not reg_no.value or not part.value:
@@ -172,21 +162,22 @@ def main(page: ft.Page):
                 show_alert(f"Database Error: {ex}")
 
         return ft.Column([
-            ft.Text("Register New Member", size=26, weight=ft.FontWeight.BOLD, color="#1f2937"),
-            card_container(ft.Column([student_name, reg_no, part, ft.Divider(color="transparent"),
-                                      ft.Button(content=ft.Text("Add Student", weight=ft.FontWeight.BOLD),
-                                                on_click=on_register, bgcolor="#1f2937", color="white", height=50,
-                                                width=300)], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                           card_width=400)
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True)
+            ft.Text("Register New Member", size=24, weight=ft.FontWeight.BOLD, color="#1f2937"),
+            card_container(ft.Column([
+                student_name, 
+                reg_no, 
+                part, 
+                ft.Divider(color="transparent", height=10),
+                ft.Row([ft.Button(content=ft.Text("Add Student", weight=ft.FontWeight.BOLD), on_click=on_register, bgcolor="#1f2937", color="white", height=50, expand=True)])
+            ]))
+        ], expand=True, alignment=ft.MainAxisAlignment.START)
 
     # ==========================================
     # PAGE 3: MARK ATTENDANCE
     # ==========================================
     def build_mark_view():
-        event_name = ft.TextField(label="Event Name (e.g. Sunday Mass)", border_radius=block_radius, expand=True)
-        event_hours = ft.TextField(label="Duration (Hours)", value="2", keyboard_type=ft.KeyboardType.NUMBER,
-                                   border_radius=block_radius, width=150)
+        event_name = ft.TextField(label="Event Name", border_radius=block_radius, expand=True)
+        event_hours = ft.TextField(label="Hours", value="2", keyboard_type=ft.KeyboardType.NUMBER, border_radius=block_radius, width=100)
 
         selected_time = datetime.datetime.now().time()
 
@@ -194,60 +185,72 @@ def main(page: ft.Page):
             nonlocal selected_time
             if time_picker.value:
                 selected_time = time_picker.value
-                time_btn.content = ft.Text(f"Time: {selected_time.strftime('%H:%M')}")
+                time_btn.content = ft.Text(f"{selected_time.strftime('%H:%M')}")
                 page.update()
 
         time_picker = ft.TimePicker(on_change=handle_time_change)
         page.overlay.append(time_picker)
 
         time_btn = ft.Button(
-            content=ft.Text(f"Time: {selected_time.strftime('%H:%M')}"),
+            content=ft.Text(f"{selected_time.strftime('%H:%M')}"),
             icon=ft.Icons.ACCESS_TIME,
-            on_click=lambda _: setattr(time_picker, 'open', True) or page.update()
+            on_click=lambda _: setattr(time_picker, 'open', True) or page.update(),
+            height=50
         )
 
         search_field = ft.TextField(
-            label="Search by Reg No...",
+            label="Search Name or ID...",
             prefix_icon=ft.Icons.SEARCH,
             border_radius=block_radius,
             expand=True,
             on_change=lambda _: filter_roster()
         )
 
-        attendance_list = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=15)
+        part_filter = ft.Dropdown(
+            options=[ft.DropdownOption("All Parts")] + [ft.DropdownOption(c) for c in categories],
+            value="All Parts", 
+            border_radius=block_radius, 
+            expand=True,
+            on_change=lambda _: filter_roster()
+        )
+
+        # Performance Optimization: Using ListView instead of Column for virtualized rendering
+        attendance_list = ft.ListView(expand=True, spacing=10)
         switches_map = {}
         all_students_cache = []
 
         def render_filtered_list(rows):
-            attendance_list.controls.clear()
+            # Batching updates to avoid flashing and lagging
+            new_controls = []
             switches_map.clear()
 
             if not rows:
-                attendance_list.controls.append(
-                    ft.Text("No students found. Please add students first.", italic=True, color="grey"))
-                page.update()
-                return
+                new_controls.append(ft.Text("No students found.", italic=True, color="grey"))
+            else:
+                current_group = ""
+                for row_data in rows:
+                    if row_data[2] != current_group:
+                        current_group = row_data[2]
+                        new_controls.append(
+                            ft.Text(f"{current_group}", weight=ft.FontWeight.BOLD, size=16, color="#2563eb"))
 
-            current_group = ""
-            for row_data in rows:
-                if row_data[2] != current_group:
-                    current_group = row_data[2]
-                    attendance_list.controls.append(
-                        ft.Text(f"— {current_group} —", weight=ft.FontWeight.BOLD, size=18, color="#2563eb"))
+                    present_switch = ft.Switch(value=False, active_color="#16a34a")
+                    switches_map[row_data[1]] = present_switch
 
-                present_switch = ft.Switch(label="Present", value=False, active_color="#16a34a")
-                switches_map[row_data[1]] = present_switch
-
-                attendance_list.controls.append(
-                    ft.Container(
-                        content=ft.Row([
-                            ft.Column([ft.Text(row_data[0].upper(), weight=ft.FontWeight.BOLD),
-                                       ft.Text(row_data[1], size=12, color="grey")]),
-                            present_switch
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                        padding=10, border=solid_border(1, "#e5e7eb")
+                    new_controls.append(
+                        ft.Container(
+                            content=ft.Row([
+                                ft.Column([
+                                    ft.Text(row_data[0].upper(), weight=ft.FontWeight.BOLD, size=14),
+                                    ft.Text(row_data[1], size=12, color="grey")
+                                ], spacing=2, expand=True),
+                                present_switch
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                            padding=10, border=solid_border(1, "#e5e7eb"), border_radius=5
+                        )
                     )
-                )
+            
+            attendance_list.controls = new_controls
             page.update()
 
         def load_roster():
@@ -260,22 +263,28 @@ def main(page: ft.Page):
                 conn.close()
                 render_filtered_list(all_students_cache)
             except psycopg2.Error as ex:
-                show_alert(f"DB Error loading roster: {ex}")
+                show_alert(f"DB Error: {ex}")
 
         def filter_roster():
             query = search_field.value.strip().lower() if search_field.value else ""
-            if not query:
-                render_filtered_list(all_students_cache)
-            else:
-                filtered = [s for s in all_students_cache if query in s[1].lower()]
-                render_filtered_list(filtered)
+            selected_part = part_filter.value
+            
+            filtered = []
+            for s in all_students_cache:
+                matches_search = not query or query in s[1].lower() or query in s[0].lower()
+                matches_part = selected_part == "All Parts" or selected_part == s[2]
+                
+                if matches_search and matches_part:
+                    filtered.append(s)
+                    
+            render_filtered_list(filtered)
 
         def save_event(_):
             if not event_name.value or not event_hours.value:
                 show_alert("Event Name and Duration required.")
                 return
             if not switches_map:
-                show_alert("No students available to save attendance for.")
+                show_alert("No students available.")
                 return
             try:
                 conn = get_db_connection()
@@ -298,27 +307,26 @@ def main(page: ft.Page):
 
                 cur.execute('COMMIT')
                 conn.close()
-                show_alert("Event & Attendance Saved Successfully!")
+                show_alert("Saved Successfully!")
                 event_name.value = ""
                 search_field.value = ""
+                part_filter.value = "All Parts"
                 load_roster()
-                page.update()
             except (psycopg2.Error, ValueError) as ex:
                 show_alert(f"Error: {ex}")
 
         load_roster()
 
         return ft.Column([
-            ft.Text("Mark Daily Attendance", size=26, weight=ft.FontWeight.BOLD, color="#1f2937"),
+            ft.Text("Mark Attendance", size=24, weight=ft.FontWeight.BOLD, color="#1f2937"),
             card_container(ft.Column([
                 ft.Row([event_name, event_hours]),
-                ft.Row([time_btn]),
-                ft.Row([search_field]),
-                ft.Button(content=ft.Text("Save Event & Roster"), on_click=save_event, bgcolor="#16a34a", color="white",
-                          height=45)
+                ft.Row([search_field, time_btn]),
+                ft.Row([part_filter]), 
+                ft.Row([ft.Button(content=ft.Text("Save Event"), on_click=save_event, bgcolor="#16a34a", color="white", height=45, expand=True)])
             ])),
-            card_container(attendance_list, card_width=800)
-        ], expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+            card_container(attendance_list)
+        ], expand=True)
 
     # ==========================================
     # PAGE 4: DAY-WISE VIEWER & PRINT
@@ -328,18 +336,25 @@ def main(page: ft.Page):
         all_events_cache = []
 
         event_search = ft.TextField(
-            label="Search Event Name...",
+            label="Search Event...",
             prefix_icon=ft.Icons.SEARCH,
             border_radius=block_radius,
             expand=True,
             on_change=lambda _: filter_events()
         )
 
-        event_dropdown = ft.Dropdown(label="Select Event on this Day", expand=True,
-                                     on_select=lambda _: load_event_roster())
+        event_dropdown = ft.Dropdown(label="Select Event", expand=True, on_select=lambda _: load_event_roster())
+        
         roster_table = ft.DataTable(
-            columns=[ft.DataColumn(ft.Text("Name")), ft.DataColumn(ft.Text("ID")), ft.DataColumn(ft.Text("Part")),
-                     ft.DataColumn(ft.Text("Status"))], rows=[])
+            columns=[
+                ft.DataColumn(ft.Text("Name")), 
+                ft.DataColumn(ft.Text("ID")), 
+                ft.DataColumn(ft.Text("Part")),
+                ft.DataColumn(ft.Text("Status"))
+            ], 
+            rows=[]
+        )
+        scrollable_table = ft.Row([roster_table], scroll=ft.ScrollMode.AUTO, expand=True)
 
         current_event_data = []
 
@@ -358,15 +373,14 @@ def main(page: ft.Page):
             date_picker.open = True
             page.update()
 
-        date_btn = ft.Button(content=ft.Text(str(selected_date)), icon=ft.Icons.CALENDAR_MONTH, on_click=open_calendar)
+        date_btn = ft.Button(content=ft.Text(str(selected_date)), icon=ft.Icons.CALENDAR_MONTH, on_click=open_calendar, height=50)
 
         def load_events_for_date():
             nonlocal all_events_cache
             try:
                 conn = get_db_connection()
                 cur = conn.cursor()
-                cur.execute('SELECT event_id, event_name, duration_hours FROM events WHERE event_date = %s',
-                            (selected_date,))
+                cur.execute('SELECT event_id, event_name, duration_hours FROM events WHERE event_date = %s', (selected_date,))
                 all_events_cache = cur.fetchall()
                 conn.close()
                 filter_events()
@@ -380,7 +394,7 @@ def main(page: ft.Page):
             else:
                 filtered = [e for e in all_events_cache if query in e[1].lower()]
 
-            event_dropdown.options = [ft.DropdownOption(key=str(e[0]), text=f"{e[1]} ({e[2]} Hrs)") for e in filtered]
+            event_dropdown.options = [ft.DropdownOption(key=str(e[0]), text=f"{e[1]} ({e[2]}h)") for e in filtered]
             event_dropdown.value = None
             roster_table.rows.clear()
             current_event_data.clear()
@@ -417,10 +431,9 @@ def main(page: ft.Page):
             except psycopg2.Error:
                 pass
 
-        # --- HTML GENERATION TO LOCAL FOLDER ---
         def generate_html_report(_):
             if not current_event_data:
-                show_alert("No event selected to print.")
+                show_alert("No event selected.")
                 return
 
             event_name_str = "Unknown Event"
@@ -431,98 +444,66 @@ def main(page: ft.Page):
                     event_duration_str = str(e[2])
                     break
 
-            # Save it securely to a local 'assets' folder inside the project
             assets_dir = os.path.join(os.getcwd(), "assets")
             os.makedirs(assets_dir, exist_ok=True)
 
             timestamp = datetime.datetime.now().strftime("%H%M%S")
-            filename = f"TJC_Attendance_{str(selected_date)}_{timestamp}.html"
+            filename = f"TJC_{str(selected_date)}_{timestamp}.html"
             file_path = os.path.join(assets_dir, filename)
 
             try:
-                # Build the HTML content
                 html_content = f"""
                 <html>
                 <head>
-                    <title>Attendance Report - {selected_date}</title>
+                    <title>Report - {selected_date}</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
                     <style>
-                        body {{ font-family: Arial, sans-serif; padding: 30px; margin: auto; max-width: 900px; }}
-                        h1 {{ text-align: center; color: #1f2937; margin-bottom: 5px; text-transform: uppercase; }}
-                        h3 {{ text-align: center; color: #6b7280; margin-top: 0; margin-bottom: 5px; }}
-                        h4 {{ text-align: center; color: #6b7280; margin-top: 0; margin-bottom: 30px; font-weight: normal; }}
-                        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
-                        th, td {{ border: 1px solid #e5e7eb; padding: 12px; text-align: left; }}
-                        th {{ background-color: #f3f4f6; color: #374151; font-weight: bold; }}
-                        tr:nth-child(even) {{ background-color: #fafafa; }}
-                        .present {{ color: #16a34a; font-weight: bold; text-align: center; }}
-                        .absent {{ color: #dc2626; font-weight: bold; text-align: center; }}
-                        .num-col {{ text-align: center; width: 40px; color: #6b7280; }}
+                        body {{ font-family: sans-serif; padding: 20px; max-width: 900px; margin: auto; }}
+                        h2 {{ text-align: center; color: #1f2937; margin-bottom: 5px; }}
+                        h4 {{ text-align: center; color: #6b7280; font-weight: normal; margin-top: 0; }}
+                        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+                        th, td {{ border: 1px solid #e5e7eb; padding: 10px; text-align: left; }}
+                        th {{ background-color: #f3f4f6; }}
+                        .present {{ color: #16a34a; font-weight: bold; }}
+                        .absent {{ color: #dc2626; font-weight: bold; }}
                     </style>
                 </head>
                 <body>
-                    <h1>{event_name_str}</h1>
-                    <h3>The Josephite Choir - Attendance Report</h3>
-                    <h4>Date: {selected_date} &nbsp; | &nbsp; Duration: {event_duration_str} Hours</h4>
+                    <h2>{event_name_str}</h2>
+                    <h4>{selected_date} | {event_duration_str} Hours</h4>
                     <table>
-                        <tr>
-                            <th class="num-col">#</th>
-                            <th>Student Name</th>
-                            <th>Reg No</th>
-                            <th>Category</th>
-                            <th style="text-align: center;">Status</th>
-                        </tr>
+                        <tr><th>Name</th><th>Reg No</th><th>Part</th><th>Status</th></tr>
                 """
 
-                for index, row in enumerate(current_event_data, start=1):
+                for row in current_event_data:
                     status_class = "present" if row[3] == "Present" else "absent"
-                    html_content += f"""
-                        <tr>
-                            <td class="num-col">{index}</td>
-                            <td>{row[0]}</td>
-                            <td>{row[1]}</td>
-                            <td>{row[2]}</td>
-                            <td class="{status_class}">{row[3]}</td>
-                        </tr>
-                    """
+                    html_content += f"<tr><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td class='{status_class}'>{row[3]}</td></tr>"
 
-                html_content += """
-                    </table>
-                </body>
-                </html>
-                """
+                html_content += "</table></body></html>"
 
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(html_content)
 
                 file_url = f"file:///{file_path.replace(os.sep, '/')}"
 
-                # --- Create the UI Dialog using Flet 1.0 async clipboard ---
                 async def copy_to_clipboard(e):
-                    # Uses the Flet 1.0 standalone Clipboard service
                     await ft.Clipboard().set(file_url)
-                    show_alert("Copied to clipboard! Paste it into Chrome or Edge.")
+                    show_alert("URL Copied!")
 
                 def close_dialog(e):
                     success_dlg.open = False
                     page.update()
 
                 success_dlg = ft.AlertDialog(
-                    title=ft.Text("Report Generated!", color="#16a34a", weight=ft.FontWeight.BOLD),
+                    title=ft.Text("Saved Successfully!", color="#16a34a", weight=ft.FontWeight.BOLD),
                     content=ft.Column([
-                        ft.Text(
-                            "The report was saved securely inside the app's internal folder. Copy the link below and paste it into any web browser to view or print it.",
-                            size=14, color="#374151"),
-                        ft.TextField(value=file_url, read_only=True, border_radius=5, height=50, text_size=13,
-                                     color="#2563eb", bgcolor="#f3f4f6")
-                    ], tight=True, spacing=15),
+                        ft.Text("Copy the URL and open in your browser:", size=14),
+                        ft.TextField(value=file_url, read_only=True, border_radius=5, height=50, text_size=13)
+                    ], tight=True, spacing=10),
                     actions=[
-                        ft.Button(content=ft.Text("Copy URL"), icon=ft.Icons.COPY, on_click=copy_to_clipboard,
-                                  bgcolor="#2563eb", color="white"),
-                        ft.Button(content=ft.Text("Open in Browser"), icon=ft.Icons.OPEN_IN_BROWSER, url=file_url,
-                                  bgcolor="#1f2937", color="white"),
+                        ft.Button(content=ft.Text("Copy URL"), icon=ft.Icons.COPY, on_click=copy_to_clipboard),
                         ft.Button(content=ft.Text("Close"), on_click=close_dialog)
                     ],
-                    actions_alignment=ft.MainAxisAlignment.END,
                 )
 
                 page.overlay.append(success_dlg)
@@ -530,21 +511,20 @@ def main(page: ft.Page):
                 page.update()
 
             except Exception as e:
-                show_alert(f"Failed to generate report: {e}")
+                show_alert(f"Failed to generate: {e}")
 
         load_events_for_date()
 
         return ft.Column([
-            ft.Text("Historical Viewer & Print", size=26, weight=ft.FontWeight.BOLD, color="#1f2937"),
+            ft.Text("Historical Viewer", size=24, weight=ft.FontWeight.BOLD, color="#1f2937"),
             card_container(ft.Column([
-                ft.Row([date_btn, ft.Container(expand=True),
-                        ft.Button(content=ft.Text("Generate Report"), on_click=generate_html_report,
-                                  icon=ft.Icons.PRINT, bgcolor="#dc2626", color="white")]),
+                ft.Row([date_btn, ft.Container(expand=True), ft.IconButton(icon=ft.Icons.PRINT, icon_color="white", bgcolor="#dc2626", on_click=generate_html_report, tooltip="Generate Report")]),
                 ft.Divider(color="transparent", height=5),
-                ft.Row([event_search, event_dropdown])
+                ft.Row([event_search]),
+                ft.Row([event_dropdown])
             ])),
-            card_container(ft.Column([roster_table], scroll=ft.ScrollMode.AUTO), card_width=800)
-        ], expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+            card_container(ft.Column([scrollable_table], expand=True))
+        ], expand=True)
 
     # ==========================================
     # PAGE 5: CREDITS CALCULATOR
@@ -552,20 +532,22 @@ def main(page: ft.Page):
     def build_credits_view():
         part_filter = ft.Dropdown(
             options=[ft.DropdownOption("All Parts")] + [ft.DropdownOption(c) for c in categories],
-            value="All Parts", width=250, border_radius=block_radius,
+            value="All Parts", border_radius=block_radius, expand=True,
             on_select=lambda _: load_credits()
         )
 
         table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Name", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("ID", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Category", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Total Hrs", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Credits", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Name")),
+                ft.DataColumn(ft.Text("ID")),
+                ft.DataColumn(ft.Text("Category")),
+                ft.DataColumn(ft.Text("Total Hrs")),
+                ft.DataColumn(ft.Text("Credits")),
             ],
             rows=[], border=solid_border(1, "#e5e7eb"), border_radius=block_radius, heading_row_color="#f9fafb"
         )
+        
+        scrollable_table = ft.Row([table], scroll=ft.ScrollMode.AUTO, expand=True)
 
         def load_credits():
             try:
@@ -604,12 +586,10 @@ def main(page: ft.Page):
         load_credits()
 
         return ft.Column([
-            card_container(
-                ft.Row([ft.Text("Credits Ledger", size=26, weight=ft.FontWeight.BOLD, color="#1f2937"), part_filter],
-                       alignment=ft.MainAxisAlignment.SPACE_BETWEEN)),
-            ft.Row([card_container(ft.Column([table], scroll=ft.ScrollMode.AUTO))],
-                   alignment=ft.MainAxisAlignment.CENTER)
-        ], expand=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+            ft.Text("Credits Ledger", size=24, weight=ft.FontWeight.BOLD, color="#1f2937"),
+            card_container(ft.Column([part_filter])),
+            card_container(ft.Column([scrollable_table], expand=True))
+        ], expand=True)
 
     navigate(None, "home")
 
