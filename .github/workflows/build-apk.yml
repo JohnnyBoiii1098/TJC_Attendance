@@ -13,9 +13,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Java
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@v4
       with:
-        distribution: 'zulu'
+        distribution: 'temurin'
         java-version: '17'
 
     - name: Set up Flutter
@@ -26,7 +26,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.11'
 
     - name: Fix Git Permissions
       run: git config --global --add safe.directory '*'
@@ -36,15 +36,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install flet
 
-    - name: Rename script for Flet
-      run: main.py
-
-    # FIX: Changed --project-name to the correct --project flag
     - name: Build Android APK
-      run: flet build apk --project "tjc_attendance" --product "TJC Attendance"
+      run: |
+        flet build apk --project "tjc_attendance" --product "TJC Attendance" -v
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: tjc-attendance-apk
-        path: build/apk/app-release.apk
+        path: build/apk/*.apk
