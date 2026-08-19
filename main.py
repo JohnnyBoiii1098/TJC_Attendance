@@ -1,22 +1,20 @@
 import flet as ft
-import psycopg2
+import pg8000.dbapi  # Swapped from psycopg2
 import math
 import datetime
 import os
-import webbrowser
 
 # --- Database Configuration ---
 DB_CONFIG = {
-    "host": "100.108.78.111",
+    "host": "192.168.1.X",  # Replace with your laptop's exact IPv4 address!
     "port": 5432,
-    "dbname": "TJC",
+    "database": "TJC",      # pg8000 uses 'database', not 'dbname'
     "user": "postgres",
     "password": "Nevve80085"
 }
 
-
 def get_db_connection():
-    return psycopg2.connect(**DB_CONFIG)
+    return pg8000.dbapi.connect(**DB_CONFIG)
 
 
 def solid_border(width_val, color_val):
