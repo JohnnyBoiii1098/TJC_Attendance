@@ -12,7 +12,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # Fix 1: Updated to v5 to clear the setup-java deprecation warning
     - name: Set up Java
       uses: actions/setup-java@v5
       with:
@@ -37,14 +36,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install flet
 
-    # Fix 2: Flet requires the entry point to be explicitly named 'main.py'
     - name: Rename script for Flet
       run: mv TJC_Attendance.py main.py
 
-    # Fix 3: Removed invalid arguments to resolve Exit Code 2
+    # FIX: Changed --project-name to the correct --project flag
     - name: Build Android APK
-      run: |
-        flet build apk --project-name "tjc_attendance" --product "TJC Attendance"
+      run: flet build apk --project "tjc_attendance" --product "TJC Attendance"
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
