@@ -33,13 +33,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi import Depends
+from app.routers.auth import require_admin_pin
+
 # Register API Routers
+# /api/auth is public (for PIN verification and auth status check)
 app.include_router(auth.router)
-app.include_router(students.router)
-app.include_router(events.router)
-app.include_router(attendance.router)
-app.include_router(credits.router)
-app.include_router(reports.router)
+
+# All data endpoints require passcode verification
+app.include_router(students.router, dependencies=[Depends(require_admin_pin)])
+app.include_router(events.router, dependencies=[Depends(require_admin_pin)])
+app.include_router(attendance.router, dependencies=[Depends(require_admin_pin)])
+app.include_router(credits.router, dependencies=[Depends(require_admin_pin)])
+app.include_router(reports.router, dependencies=[Depends(require_admin_pin)])
+
 
 # Health check
 @app.get("/api/health", tags=["Health"])

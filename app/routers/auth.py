@@ -5,19 +5,25 @@ from app.schemas import VerifyPinRequest, VerifyPinResponse
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
-def require_admin_pin(x_admin_pin: Optional[str] = Header(None, alias="X-Admin-PIN")):
+from fastapi import Query
+
+def require_admin_pin(
+    x_admin_pin: Optional[str] = Header(None, alias="X-Admin-PIN"),
+    pin: Optional[str] = Query(None)
+):
     """
-    Dependency to protect sensitive write endpoints with the admin PIN.
-    Can be provided via the HTTP header 'X-Admin-PIN'.
+    Dependency to protect endpoints with the access passcode.
+    Can be provided via the HTTP header 'X-Admin-PIN' or query parameter '?pin=...'.
     """
     if not ADMIN_PASSCODE:
         # If no passcode is set in .env, permit actions freely
         return True
 
-    if not x_admin_pin or x_admin_pin.strip() != ADMIN_PASSCODE.strip():
+    candidate = (x_admin_pin or pin or "").strip()
+    if candidate != ADMIN_PASSCODE.strip():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing Admin PIN. Please authenticate."
+            detail="Invalid or missing access passcode. Please authenticate."
         )
     return True
 

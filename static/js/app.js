@@ -6,7 +6,7 @@ const CATEGORIES = ["Alto", "Bass", "Soprano", "Tenor", "Band", "Conductors"];
 
 // Global App State
 let state = {
-  adminPin: localStorage.getItem('tjc_admin_pin') || '',
+  adminPin: localStorage.getItem('tjc_admin_pin') || sessionStorage.getItem('tjc_admin_pin') || '',
   allStudents: [],
   attendanceMap: {}, // reg_no -> boolean (true=present, false=absent)
   currentMarkCategory: 'All Parts',
@@ -18,12 +18,8 @@ let state = {
 };
 
 // Initialize Application on Page Load
-document.addEventListener('DOMContentLoaded', () => {
-  // Setup Lucide icons
+document.addEventListener('DOMContentLoaded', async () => {
   lucide.createIcons();
-
-  // Check stored Admin PIN status
-  checkAdminAuth();
 
   // Set today's date in date pickers
   const todayStr = new Date().toISOString().split('T')[0];
@@ -32,10 +28,28 @@ document.addEventListener('DOMContentLoaded', () => {
   if (markDateInput) markDateInput.value = todayStr;
   if (viewerDateInput) viewerDateInput.value = todayStr;
 
-  // Load Initial Dashboard
-  loadDashboardData();
-  initMarkCategories();
-  initCreditsCategories();
+  // Check stored passcode/PIN status
+  const storedPin = localStorage.getItem('tjc_admin_pin') || sessionStorage.getItem('tjc_admin_pin');
+  if (storedPin) {
+    state.adminPin = storedPin;
+    try {
+      const res = await fetch(`${API_BASE}/auth/status`, {
+        headers: { 'X-Admin-PIN': storedPin }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.is_authenticated) {
+          showDashboard();
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Initial session validation error:', err);
+    }
+  }
+
+  // Not authenticated: strictly lock the portal
+  lockPortal(false);
 });
 
 // ================= UI HELPERS & NOTIFICATIONS =================
@@ -74,6 +88,144 @@ function getAuthHeaders() {
     headers['X-Admin-PIN'] = state.adminPin;
   }
   return headers;
+}
+
+// Universal authenticated fetch wrapper that handles passcode enforcement
+async function apiFetch(url, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+  if (state.adminPin) {
+    headers['X-Admin-PIN'] = state.adminPin;
+  }
+
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401) {
+    lockPortal(true);
+    showToast('Access passcode required to view this page.', 'error');
+    throw new Error('Unauthorized');
+  }
+  return response;
+}
+
+// ================= PASSCODE GATEKEEPER / LOCK SCREEN =================
+
+function togglePasscodeVisibility() {
+  const input = document.getElementById('portalPasscodeInput');
+  const eyeIcon = document.getElementById('passcodeEyeIcon');
+  if (!input) return;
+
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye-off');
+  } else {
+    input.type = 'password';
+    if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye');
+  }
+  lucide.createIcons();
+}
+
+async function submitLockScreenPasscode() {
+  const input = document.getElementById('portalPasscodeInput');
+  const errorDiv = document.getElementById('lockScreenError');
+  const errorText = document.getElementById('lockScreenErrorText');
+  const unlockBtn = document.getElementById('unlockPortalBtn');
+  const remember = document.getElementById('rememberPasscodeDevice')?.checked ?? true;
+
+  const pin = input ? input.value.trim() : '';
+  if (!pin) {
+    if (errorText) errorText.textContent = 'Please enter the access passcode.';
+    if (errorDiv) errorDiv.classList.remove('hidden');
+    return;
+  }
+
+  if (unlockBtn) {
+    unlockBtn.disabled = true;
+    unlockBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-tjcGold"></i> <span>Verifying...</span>';
+    lucide.createIcons();
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin })
+    });
+
+    if (res.ok) {
+      state.adminPin = pin;
+      if (remember) {
+        localStorage.setItem('tjc_admin_pin', pin);
+      } else {
+        sessionStorage.setItem('tjc_admin_pin', pin);
+      }
+
+      if (errorDiv) errorDiv.classList.add('hidden');
+      showDashboard();
+      showToast('Portal unlocked. Welcome!', 'success');
+    } else {
+      if (errorText) errorText.textContent = 'Incorrect passcode. Please try again.';
+      if (errorDiv) errorDiv.classList.remove('hidden');
+      if (input) {
+        input.classList.add('border-rose-400');
+        input.select();
+      }
+    }
+  } catch (err) {
+    if (errorText) errorText.textContent = 'Network or server error. Please try again.';
+    if (errorDiv) errorDiv.classList.remove('hidden');
+  } finally {
+    if (unlockBtn) {
+      unlockBtn.disabled = false;
+      unlockBtn.innerHTML = '<i data-lucide="unlock" class="w-4 h-4 text-tjcGold"></i> <span>Unlock Portal</span>';
+      lucide.createIcons();
+    }
+  }
+}
+
+function showDashboard() {
+  const lockScreen = document.getElementById('lockScreen');
+  const appContainer = document.getElementById('appContainer');
+
+  if (lockScreen) lockScreen.classList.add('hidden');
+  if (appContainer) appContainer.classList.remove('hidden');
+
+  loadDashboardData();
+  initMarkCategories();
+  initCreditsCategories();
+  lucide.createIcons();
+}
+
+function lockPortal(showMessage = true) {
+  state.adminPin = '';
+  localStorage.removeItem('tjc_admin_pin');
+  sessionStorage.removeItem('tjc_admin_pin');
+  state.allStudents = [];
+  state.allCreditsRows = [];
+  state.currentEventRoster = [];
+
+  const lockScreen = document.getElementById('lockScreen');
+  const appContainer = document.getElementById('appContainer');
+  const input = document.getElementById('portalPasscodeInput');
+  const errorDiv = document.getElementById('lockScreenError');
+
+  if (errorDiv) errorDiv.classList.add('hidden');
+  if (input) {
+    input.value = '';
+    input.classList.remove('border-rose-400');
+  }
+
+  if (appContainer) appContainer.classList.add('hidden');
+  if (lockScreen) {
+    lockScreen.classList.remove('hidden');
+    setTimeout(() => input?.focus(), 150);
+  }
+
+  lucide.createIcons();
+  if (showMessage) {
+    showToast('Portal locked.');
+  }
 }
 
 // ================= NAVIGATION =================
@@ -115,105 +267,12 @@ function toggleMobileMenu() {
   if (menu) menu.classList.toggle('hidden');
 }
 
-// ================= AUTHENTICATION & PIN MODAL =================
-
-async function checkAdminAuth() {
-  const statusBtn = document.getElementById('adminStatusBtn');
-  const lockIcon = document.getElementById('adminLockIcon');
-  const statusText = document.getElementById('adminStatusText');
-
-  if (!state.adminPin) {
-    if (statusText) statusText.textContent = 'Admin PIN';
-    if (statusBtn) statusBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-white border border-white/20 hover:bg-white/20 transition-all shadow-sm';
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}/auth/status`, { headers: getAuthHeaders() });
-    const data = await res.json();
-    if (data.is_authenticated) {
-      if (statusText) statusText.textContent = 'Unlocked';
-      if (statusBtn) statusBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-600/90 text-white border border-emerald-400 hover:bg-emerald-600 transition-all shadow-sm';
-      if (lockIcon) lockIcon.setAttribute('data-lucide', 'unlock');
-      lucide.createIcons();
-    } else {
-      state.adminPin = '';
-      localStorage.removeItem('tjc_admin_pin');
-      if (statusText) statusText.textContent = 'Admin PIN';
-    }
-  } catch (err) {
-    console.error('Auth check error:', err);
-  }
-}
-
-function openPinModal(callback = null) {
-  state.pendingPinAction = callback;
-  const modal = document.getElementById('pinModal');
-  const pinInput = document.getElementById('adminPinInput');
-  const errorMsg = document.getElementById('pinErrorMsg');
-  if (errorMsg) errorMsg.classList.add('hidden');
-  if (pinInput) {
-    pinInput.value = '';
-    setTimeout(() => pinInput.focus(), 100);
-  }
-  if (modal) modal.classList.remove('hidden');
-}
-
-function closePinModal() {
-  const modal = document.getElementById('pinModal');
-  if (modal) modal.classList.add('hidden');
-  state.pendingPinAction = null;
-}
-
-async function verifyAndSavePin() {
-  const pinInput = document.getElementById('adminPinInput');
-  const errorMsg = document.getElementById('pinErrorMsg');
-  const remember = document.getElementById('rememberPin').checked;
-  const pin = pinInput.value.trim();
-
-  if (!pin) {
-    errorMsg.textContent = 'Please enter a PIN.';
-    errorMsg.classList.remove('hidden');
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}/auth/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin })
-    });
-
-    if (res.ok) {
-      state.adminPin = pin;
-      if (remember) {
-        localStorage.setItem('tjc_admin_pin', pin);
-      }
-      closePinModal();
-      checkAdminAuth();
-      showToast('Admin Mode unlocked!');
-
-      if (typeof state.pendingPinAction === 'function') {
-        const action = state.pendingPinAction;
-        state.pendingPinAction = null;
-        action();
-      }
-    } else {
-      errorMsg.textContent = 'Incorrect PIN. Please try again.';
-      errorMsg.classList.remove('hidden');
-    }
-  } catch (e) {
-    errorMsg.textContent = 'Network or server error verifying PIN.';
-    errorMsg.classList.remove('hidden');
-  }
-}
-
 // ================= VIEW 1: HOME / DASHBOARD =================
 
 async function loadDashboardData() {
   try {
     // 1. Fetch Students count
-    const studentsRes = await fetch(`${API_BASE}/students`);
+    const studentsRes = await apiFetch(`${API_BASE}/students`);
     if (studentsRes.ok) {
       const students = await studentsRes.json();
       state.allStudents = students;
@@ -222,7 +281,7 @@ async function loadDashboardData() {
     }
 
     // 2. Fetch Events
-    const eventsRes = await fetch(`${API_BASE}/events`);
+    const eventsRes = await apiFetch(`${API_BASE}/events`);
     if (eventsRes.ok) {
       const events = await eventsRes.json();
       const statEventsElem = document.getElementById('statTotalEvents');
@@ -301,7 +360,7 @@ function applyPresetTitle(val) {
 
 async function loadMarkTab() {
   try {
-    const res = await fetch(`${API_BASE}/students`);
+    const res = await apiFetch(`${API_BASE}/students`);
     if (res.ok) {
       state.allStudents = await res.json();
       // Initialize attendance map if empty
@@ -319,20 +378,26 @@ async function loadMarkTab() {
 }
 
 function filterMarkRoster() {
+  const part = state.currentMarkCategory;
   const query = (document.getElementById('markSearchInput')?.value || '').trim().toLowerCase();
-  const container = document.getElementById('markRosterContainer');
-  if (!container) return;
 
   const filtered = state.allStudents.filter(s => {
-    const matchesCategory = (state.currentMarkCategory === 'All Parts' || s.part === state.currentMarkCategory);
+    const matchesCategory = (part === 'All Parts' || s.part === part);
     const matchesSearch = (!query || s.student_name.toLowerCase().includes(query) || s.reg_no.toLowerCase().includes(query));
     return matchesCategory && matchesSearch;
   });
 
-  if (filtered.length === 0) {
+  renderMarkRoster(filtered);
+}
+
+function renderMarkRoster(students) {
+  const container = document.getElementById('attendanceGrid');
+  if (!container) return;
+
+  if (students.length === 0) {
     container.innerHTML = `
-      <div class="p-8 text-center text-slate-400 text-sm">
-        <i data-lucide="user-x" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+      <div class="col-span-full py-12 text-center text-slate-400">
+        <i data-lucide="users" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
         No students found matching current filters.
       </div>
     `;
@@ -340,35 +405,30 @@ function filterMarkRoster() {
     return;
   }
 
-  // Render list of students
-  container.innerHTML = filtered.map(s => {
+  container.innerHTML = students.map(s => {
     const isPresent = Boolean(state.attendanceMap[s.reg_no]);
     return `
-      <div class="p-3.5 sm:p-4 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-full ${isPresent ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'} flex items-center justify-center font-bold text-xs uppercase">
-            ${s.student_name.slice(0, 2)}
-          </div>
-          <div>
-            <h4 class="font-bold text-slate-900 text-sm leading-tight">${s.student_name.toUpperCase()}</h4>
-            <div class="flex items-center gap-2 mt-0.5">
-              <span class="text-xs text-slate-500 font-mono">${s.reg_no}</span>
-              <span class="text-slate-300">&bull;</span>
-              <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">${s.part}</span>
-            </div>
+      <div class="bg-white rounded-xl p-4 border transition-all shadow-sm flex items-center justify-between gap-3 ${
+        isPresent ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'
+      }">
+        <div class="min-w-0 flex-1">
+          <h4 class="font-bold text-slate-800 text-sm truncate uppercase">${s.student_name}</h4>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span class="text-xs text-slate-500 font-mono">${s.reg_no}</span>
+            <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">${s.part}</span>
           </div>
         </div>
 
-        <!-- Custom Switch Control -->
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-semibold ${isPresent ? 'text-emerald-700' : 'text-slate-400'} hidden sm:inline">
-            ${isPresent ? 'Present' : 'Absent'}
-          </span>
-          <label class="switch">
-            <input type="checkbox" ${isPresent ? 'checked' : ''} onchange="toggleStudentAttendance('${s.reg_no}', this.checked)">
-            <span class="slider"></span>
-          </label>
-        </div>
+        <!-- Custom iOS/Tailwind Toggle Switch -->
+        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+          <input 
+            type="checkbox" 
+            class="sr-only peer" 
+            ${isPresent ? 'checked' : ''} 
+            onchange="toggleAttendance('${s.reg_no}')"
+          >
+          <div class="w-12 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+        </label>
       </div>
     `;
   }).join('');
@@ -376,9 +436,29 @@ function filterMarkRoster() {
   lucide.createIcons();
 }
 
-function toggleStudentAttendance(regNo, isChecked) {
-  state.attendanceMap[regNo] = Boolean(isChecked);
+function toggleAttendance(regNo) {
+  state.attendanceMap[regNo] = !state.attendanceMap[regNo];
   updateMarkCounters();
+  filterMarkRoster();
+}
+
+function markFiltered(status) {
+  const part = state.currentMarkCategory;
+  const query = (document.getElementById('markSearchInput')?.value || '').trim().toLowerCase();
+
+  const filtered = state.allStudents.filter(s => {
+    const matchesCategory = (part === 'All Parts' || s.part === part);
+    const matchesSearch = (!query || s.student_name.toLowerCase().includes(query) || s.reg_no.toLowerCase().includes(query));
+    return matchesCategory && matchesSearch;
+  });
+
+  filtered.forEach(s => {
+    state.attendanceMap[s.reg_no] = status;
+  });
+
+  filterMarkRoster();
+  updateMarkCounters();
+  showToast(`Marked ${filtered.length} students ${status ? 'Present' : 'Absent'}`);
 }
 
 function updateMarkCounters() {
@@ -389,48 +469,28 @@ function updateMarkCounters() {
   }
   const absent = total - present;
 
-  const cntPresent = document.getElementById('cntPresent');
-  const cntAbsent = document.getElementById('cntAbsent');
-  const saveBarCount = document.getElementById('saveBarCount');
-
-  if (cntPresent) cntPresent.textContent = present;
-  if (cntAbsent) cntAbsent.textContent = absent;
-  if (saveBarCount) saveBarCount.textContent = total;
+  const presentBadge = document.getElementById('livePresentCount');
+  const absentBadge = document.getElementById('liveAbsentCount');
+  if (presentBadge) presentBadge.textContent = `${present} Present`;
+  if (absentBadge) absentBadge.textContent = `${absent} Absent`;
 }
 
-function bulkSetAttendance(status) {
-  const query = (document.getElementById('markSearchInput')?.value || '').trim().toLowerCase();
-  state.allStudents.forEach(s => {
-    const matchesCategory = (state.currentMarkCategory === 'All Parts' || s.part === state.currentMarkCategory);
-    const matchesSearch = (!query || s.student_name.toLowerCase().includes(query) || s.reg_no.toLowerCase().includes(query));
-    if (matchesCategory && matchesSearch) {
-      state.attendanceMap[s.reg_no] = status;
-    }
-  });
-  filterMarkRoster();
-  updateMarkCounters();
-}
-
-async function submitAttendance() {
+async function saveAttendance() {
   const eventName = (document.getElementById('markEventName')?.value || '').trim();
-  const eventHours = parseFloat(document.getElementById('markEventHours')?.value || '2.0');
   const eventDate = document.getElementById('markEventDate')?.value;
+  const eventHours = parseFloat(document.getElementById('markEventHours')?.value || '1.0');
 
   if (!eventName) {
-    showToast('Please enter an Event / Rehearsal Name.', 'error');
+    showToast('Please specify an event name / session title.', 'error');
     document.getElementById('markEventName')?.focus();
     return;
   }
+
   if (!eventDate) {
-    showToast('Please select a valid date.', 'error');
-    return;
-  }
-  if (isNaN(eventHours) || eventHours <= 0) {
-    showToast('Please enter a valid duration in hours.', 'error');
+    showToast('Please pick an event date.', 'error');
     return;
   }
 
-  // Construct attendance payload
   const records = state.allStudents.map(s => ({
     reg_no: s.reg_no,
     is_present: Boolean(state.attendanceMap[s.reg_no])
@@ -443,49 +503,34 @@ async function submitAttendance() {
     records: records
   };
 
-  const doSave = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/attendance/save`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload)
-      });
+  try {
+    const res = await apiFetch(`${API_BASE}/attendance/save`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
 
-      if (res.status === 401) {
-        showToast('Admin PIN required to save attendance.', 'error');
-        openPinModal(doSave);
-        return;
-      }
-
-      if (!res.ok) {
-        const err = await res.json();
-        showToast(err.detail || 'Failed to save attendance', 'error');
-        return;
-      }
-
-      const result = await res.json();
-      showToast(`Saved! ${result.present_count} present, ${result.absent_count} absent.`);
-
-      // Reset form and switches
-      document.getElementById('markEventName').value = '';
-      state.allStudents.forEach(s => state.attendanceMap[s.reg_no] = false);
-      filterMarkRoster();
-      updateMarkCounters();
-
-      // Switch to Day Viewer to show saved report
-      setTimeout(() => {
-        inspectEventFromDashboard(result.event_id, result.event_date);
-      }, 800);
-
-    } catch (err) {
-      showToast('Network error while saving attendance.', 'error');
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.detail || 'Failed to save attendance', 'error');
+      return;
     }
-  };
 
-  if (!state.adminPin) {
-    openPinModal(doSave);
-  } else {
-    doSave();
+    const result = await res.json();
+    showToast(`Saved! ${result.present_count} present, ${result.absent_count} absent.`);
+
+    // Reset form and switches
+    document.getElementById('markEventName').value = '';
+    state.allStudents.forEach(s => state.attendanceMap[s.reg_no] = false);
+    filterMarkRoster();
+    updateMarkCounters();
+
+    // Switch to Day Viewer to show saved report
+    setTimeout(() => {
+      inspectEventFromDashboard(result.event_id, result.event_date);
+    }, 800);
+
+  } catch (err) {
+    console.error('Save attendance error:', err);
   }
 }
 
@@ -504,7 +549,7 @@ async function loadEventsForDate(dateStr, selectEventId = null) {
   select.innerHTML = '<option value="">Loading events...</option>';
 
   try {
-    const res = await fetch(`${API_BASE}/events?date=${dateStr}`);
+    const res = await apiFetch(`${API_BASE}/events?date=${dateStr}`);
     if (!res.ok) throw new Error();
     const events = await res.json();
 
@@ -542,7 +587,7 @@ async function loadEventRoster(eventId) {
   state.selectedEventId = parseInt(eventId);
 
   try {
-    const res = await fetch(`${API_BASE}/attendance/event/${eventId}`);
+    const res = await apiFetch(`${API_BASE}/attendance/event/${eventId}`);
     if (!res.ok) throw new Error();
     const data = await res.json();
 
@@ -608,12 +653,14 @@ function hideViewerRoster() {
 
 function openPrintableReport() {
   if (!state.selectedEventId) return;
-  window.open(`${API_BASE}/reports/html/${state.selectedEventId}`, '_blank');
+  const pinQuery = state.adminPin ? `?pin=${encodeURIComponent(state.adminPin)}` : '';
+  window.open(`${API_BASE}/reports/html/${state.selectedEventId}${pinQuery}`, '_blank');
 }
 
 function downloadEventCsv() {
   if (!state.selectedEventId) return;
-  window.location.href = `${API_BASE}/reports/csv/${state.selectedEventId}`;
+  const pinQuery = state.adminPin ? `?pin=${encodeURIComponent(state.adminPin)}` : '';
+  window.location.href = `${API_BASE}/reports/csv/${state.selectedEventId}${pinQuery}`;
 }
 
 // ================= VIEW 4: CREDITS LEDGER =================
@@ -645,7 +692,7 @@ async function loadCreditsLedger(part = 'All Parts') {
 
   try {
     const url = part && part !== 'All Parts' ? `${API_BASE}/credits?part=${encodeURIComponent(part)}` : `${API_BASE}/credits`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) throw new Error();
     const data = await res.json();
 
@@ -697,8 +744,12 @@ function filterCreditsTable() {
 
 function downloadCreditsCsv() {
   const part = state.currentCreditsCategory;
-  const url = part && part !== 'All Parts' ? `${API_BASE}/reports/credits/csv?part=${encodeURIComponent(part)}` : `${API_BASE}/reports/credits/csv`;
-  window.location.href = url;
+  const baseUrl = part && part !== 'All Parts' 
+    ? `${API_BASE}/reports/credits/csv?part=${encodeURIComponent(part)}` 
+    : `${API_BASE}/reports/credits/csv`;
+  const sep = baseUrl.includes('?') ? '&' : '?';
+  const pinParam = state.adminPin ? `${sep}pin=${encodeURIComponent(state.adminPin)}` : '';
+  window.location.href = `${baseUrl}${pinParam}`;
 }
 
 // ================= VIEW 5: MEMBERS DIRECTORY =================
@@ -709,7 +760,7 @@ async function loadMembersList() {
   if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-slate-400 italic">Loading choir members...</td></tr>';
 
   try {
-    const res = await fetch(`${API_BASE}/students`);
+    const res = await apiFetch(`${API_BASE}/students`);
     if (!res.ok) throw new Error();
     const students = await res.json();
     state.allStudents = students;
@@ -770,77 +821,47 @@ async function submitNewStudent(event) {
     return;
   }
 
-  const doAdd = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/students`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ student_name: name, reg_no: regNo, part: part })
-      });
+  try {
+    const res = await apiFetch(`${API_BASE}/students`, {
+      method: 'POST',
+      body: JSON.stringify({ student_name: name, reg_no: regNo, part: part })
+    });
 
-      if (res.status === 401) {
-        showToast('Admin PIN required to add members.', 'error');
-        openPinModal(doAdd);
-        return;
-      }
-
-      if (res.status === 409) {
-        showToast(`Registration ID '${regNo}' is already taken.`, 'error');
-        return;
-      }
-
-      if (!res.ok) {
-        const err = await res.json();
-        showToast(err.detail || 'Failed to add student.', 'error');
-        return;
-      }
-
-      showToast(`${name} added to ${part}!`);
-      document.getElementById('addStudentForm').reset();
-      loadMembersList();
-    } catch (err) {
-      showToast('Network error while adding member.', 'error');
+    if (res.status === 409) {
+      showToast(`Registration ID '${regNo}' is already taken.`, 'error');
+      return;
     }
-  };
 
-  if (!state.adminPin) {
-    openPinModal(doAdd);
-  } else {
-    doAdd();
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.detail || 'Failed to add student.', 'error');
+      return;
+    }
+
+    showToast(`${name} added to ${part}!`);
+    document.getElementById('addStudentForm').reset();
+    loadMembersList();
+  } catch (err) {
+    console.error('Add member error:', err);
   }
 }
 
 async function confirmDeleteStudent(regNo, name) {
   if (!confirm(`Are you sure you want to remove ${name} (${regNo}) from the choir?`)) return;
 
-  const doDelete = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/students/${encodeURIComponent(regNo)}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
+  try {
+    const res = await apiFetch(`${API_BASE}/students/${encodeURIComponent(regNo)}`, {
+      method: 'DELETE'
+    });
 
-      if (res.status === 401) {
-        showToast('Admin PIN required to delete members.', 'error');
-        openPinModal(doDelete);
-        return;
-      }
-
-      if (!res.ok) {
-        showToast('Failed to delete student.', 'error');
-        return;
-      }
-
-      showToast(`${name} removed successfully.`);
-      loadMembersList();
-    } catch (err) {
-      showToast('Network error while deleting member.', 'error');
+    if (!res.ok) {
+      showToast('Failed to delete student.', 'error');
+      return;
     }
-  };
 
-  if (!state.adminPin) {
-    openPinModal(doDelete);
-  } else {
-    doDelete();
+    showToast(`${name} removed successfully.`);
+    loadMembersList();
+  } catch (err) {
+    console.error('Delete member error:', err);
   }
 }
