@@ -48,6 +48,7 @@ def init_db():
         event_name VARCHAR(255) NOT NULL,
         event_date DATE NOT NULL,
         duration_hours NUMERIC(4, 2) NOT NULL DEFAULT 2.0,
+        start_time VARCHAR(50) DEFAULT '',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -71,6 +72,11 @@ def init_db():
         ) THEN 
             ALTER TABLE attendance_logs ADD CONSTRAINT unique_event_student UNIQUE (event_id, reg_no);
         END IF; 
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns WHERE table_name = 'events' AND column_name = 'start_time'
+        ) THEN 
+            ALTER TABLE events ADD COLUMN start_time VARCHAR(50) DEFAULT '';
+        END IF;
     END $$;
     """
     try:

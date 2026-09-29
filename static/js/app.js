@@ -28,6 +28,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (markDateInput) markDateInput.value = todayStr;
   if (viewerDateInput) viewerDateInput.value = todayStr;
 
+  // Initialize clock / duration summary
+  updateEventTimeSummary();
+
   // Check stored passcode/PIN status
   const storedPin = localStorage.getItem('tjc_admin_pin') || sessionStorage.getItem('tjc_admin_pin');
   if (storedPin) {
@@ -194,6 +197,7 @@ function showDashboard() {
   loadDashboardData();
   initMarkCategories();
   initCreditsCategories();
+  updateEventTimeSummary();
   lucide.createIcons();
 }
 
@@ -269,7 +273,7 @@ function toggleMobileMenu() {
 
 // ================= VIEW 1: HOME / DASHBOARD =================
 
-async function loadDashboardData() {
+async function loadDashboardData(showToastMsg = false) {
   try {
     // 1. Fetch Students count
     const studentsRes = await apiFetch(`${API_BASE}/students`);
@@ -306,7 +310,7 @@ async function loadDashboardData() {
                 </div>
                 <div>
                   <h4 class="font-bold text-slate-800 text-sm">${ev.event_name}</h4>
-                  <p class="text-xs text-slate-500">${ev.event_date}</p>
+                  <p class="text-xs text-slate-500">${ev.event_date}${ev.start_time ? ' • Starts ' + ev.start_time : ''}</p>
                 </div>
               </div>
               <button onclick="inspectEventFromDashboard(${ev.event_id}, '${ev.event_date}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-tjcNavy hover:text-tjcGold transition-colors flex items-center gap-1">
@@ -318,8 +322,13 @@ async function loadDashboardData() {
         lucide.createIcons();
       }
     }
+
+    if (showToastMsg) {
+      showToast('Dashboard stats updated.', 'success');
+    }
   } catch (err) {
     console.error('Error loading dashboard data:', err);
+    if (showToastMsg) showToast('Failed to refresh dashboard.', 'error');
   }
 }
 
@@ -331,6 +340,51 @@ function inspectEventFromDashboard(eventId, eventDate) {
 }
 
 // ================= VIEW 2: MARK ATTENDANCE =================
+
+function setEventDuration(hours) {
+  const hoursInput = document.getElementById('markEventHours');
+  if (hoursInput) {
+    hoursInput.value = hours;
+    updateEventTimeSummary();
+  }
+}
+
+function updateEventTimeSummary() {
+  const timeInput = document.getElementById('markEventTime');
+  const hoursInput = document.getElementById('markEventHours');
+  const summaryElem = document.getElementById('eventTimeSummary');
+  if (!summaryElem) return;
+
+  const timeVal = timeInput ? timeInput.value : '16:30';
+  const hours = parseFloat(hoursInput?.value || '2.0');
+
+  if (!timeVal) {
+    summaryElem.innerHTML = `Duration: <strong>${hours}h</strong> credit for attendees`;
+    return;
+  }
+
+  // Parse start time (HH:MM)
+  const parts = timeVal.split(':');
+  if (parts.length < 2) return;
+  const startH = parseInt(parts[0], 10);
+  const startM = parseInt(parts[1], 10);
+
+  // Format 12-hour start time
+  const startPeriod = startH >= 12 ? 'PM' : 'AM';
+  const startH12 = startH % 12 || 12;
+  const startFormatted = `${startH12}:${startM < 10 ? '0' : ''}${startM} ${startPeriod}`;
+
+  // Calculate end time
+  const totalMinutes = Math.round(hours * 60);
+  const endTotalMins = (startH * 60 + startM + totalMinutes) % (24 * 60);
+  const endH = Math.floor(endTotalMins / 60);
+  const endM = endTotalMins % 60;
+  const endPeriod = endH >= 12 ? 'PM' : 'AM';
+  const endH12 = endH % 12 || 12;
+  const endFormatted = `${endH12}:${endM < 10 ? '0' : ''}${endM} ${endPeriod}`;
+
+  summaryElem.innerHTML = `Counted from <strong>${startFormatted}</strong> to <strong>${endFormatted}</strong> (${hours} hrs credit)`;
+}
 
 function initMarkCategories() {
   const container = document.getElementById('markCategoryTabs');
@@ -352,29 +406,45 @@ function setMarkCategory(part) {
   filterMarkRoster();
 }
 
-function applyPresetTitle(val) {
-  if (!val) return;
-  const nameInput = document.getElementById('markEventName');
-  if (nameInput) nameInput.value = val;
-}
+// Internal refresh function: seamlessly merges newly added students without losing toggled attendance
+async function refreshMarkRoster(showToastMsg = true) {
+  const icon = document.getElementById('refreshRosterIcon');
+  if (icon) icon.classList.add('animate-spin');
 
-async function loadMarkTab() {
   try {
     const res = await apiFetch(`${API_BASE}/students`);
     if (res.ok) {
-      state.allStudents = await res.json();
-      // Initialize attendance map if empty
-      state.allStudents.forEach(s => {
+      const students = await res.json();
+      state.allStudents = students;
+
+      // Merge new students into attendance map without overwriting existing marks
+      students.forEach(s => {
         if (!(s.reg_no in state.attendanceMap)) {
-          state.attendanceMap[s.reg_no] = false; // Default to absent until toggled
+          state.attendanceMap[s.reg_no] = false;
         }
       });
+
       filterMarkRoster();
       updateMarkCounters();
+
+      if (showToastMsg) {
+        showToast(`Roster refreshed! ${students.length} members loaded.`, 'success');
+      }
     }
   } catch (err) {
-    showToast('Failed to load student roster', 'error');
+    if (showToastMsg) {
+      showToast('Failed to refresh roster.', 'error');
+    }
+  } finally {
+    if (icon) {
+      setTimeout(() => icon.classList.remove('animate-spin'), 400);
+    }
   }
+}
+
+async function loadMarkTab() {
+  await refreshMarkRoster(false);
+  updateEventTimeSummary();
 }
 
 function filterMarkRoster() {
@@ -391,7 +461,7 @@ function filterMarkRoster() {
 }
 
 function renderMarkRoster(students) {
-  const container = document.getElementById('attendanceGrid');
+  const container = document.getElementById('markRosterContainer') || document.getElementById('attendanceGrid');
   if (!container) return;
 
   if (students.length === 0) {
@@ -469,16 +539,20 @@ function updateMarkCounters() {
   }
   const absent = total - present;
 
-  const presentBadge = document.getElementById('livePresentCount');
-  const absentBadge = document.getElementById('liveAbsentCount');
-  if (presentBadge) presentBadge.textContent = `${present} Present`;
-  if (absentBadge) absentBadge.textContent = `${absent} Absent`;
+  const cntPresent = document.getElementById('cntPresent') || document.getElementById('livePresentCount');
+  const cntAbsent = document.getElementById('cntAbsent') || document.getElementById('liveAbsentCount');
+  const saveBarCount = document.getElementById('saveBarCount');
+
+  if (cntPresent) cntPresent.textContent = `${present}`;
+  if (cntAbsent) cntAbsent.textContent = `${absent}`;
+  if (saveBarCount) saveBarCount.textContent = `${total}`;
 }
 
 async function saveAttendance() {
   const eventName = (document.getElementById('markEventName')?.value || '').trim();
   const eventDate = document.getElementById('markEventDate')?.value;
-  const eventHours = parseFloat(document.getElementById('markEventHours')?.value || '1.0');
+  const eventTime = (document.getElementById('markEventTime')?.value || '').trim();
+  const eventHours = parseFloat(document.getElementById('markEventHours')?.value || '2.0');
 
   if (!eventName) {
     showToast('Please specify an event name / session title.', 'error');
@@ -500,6 +574,7 @@ async function saveAttendance() {
     event_name: eventName,
     event_date: eventDate,
     duration_hours: eventHours,
+    start_time: eventTime,
     records: records
   };
 
@@ -561,7 +636,7 @@ async function loadEventsForDate(dateStr, selectEventId = null) {
 
     select.innerHTML = '<option value="">Choose an event...</option>' + events.map(e => `
       <option value="${e.event_id}" ${selectEventId && selectEventId === e.event_id ? 'selected' : ''}>
-        ${e.event_name} (${e.duration_hours}h)
+        ${e.event_name} (${e.start_time ? e.start_time + ', ' : ''}${e.duration_hours}h)
       </option>
     `).join('');
 
@@ -594,7 +669,8 @@ async function loadEventRoster(eventId) {
     // Populate Event Header
     document.getElementById('viewerEventHeader').classList.remove('hidden');
     document.getElementById('viewerEventTitle').textContent = data.event.event_name;
-    document.getElementById('viewerEventDuration').textContent = `${data.event.duration_hours}h`;
+    const timePrefix = data.event.start_time ? `${data.event.start_time} • ` : '';
+    document.getElementById('viewerEventDuration').textContent = `${timePrefix}${data.event.duration_hours}h`;
     document.getElementById('viewerEventDate').textContent = data.event.event_date;
     document.getElementById('viewerRosterStats').textContent = `${data.total_present} Present, ${data.total_absent} Absent (Total: ${data.total_students})`;
 
@@ -685,9 +761,13 @@ function setCreditsCategory(part) {
   loadCreditsLedger(part);
 }
 
-async function loadCreditsLedger(part = 'All Parts') {
+async function loadCreditsLedger(part = 'All Parts', showToastMsg = false) {
   const tbody = document.getElementById('creditsTableBody');
   const countBadge = document.getElementById('creditsRecordCount');
+  const refreshBtn = document.getElementById('refreshCreditsBtn');
+  const icon = refreshBtn?.querySelector('i');
+  if (icon) icon.classList.add('animate-spin');
+
   if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400 italic">Calculating attendance hours & credits...</td></tr>';
 
   try {
@@ -700,8 +780,15 @@ async function loadCreditsLedger(part = 'All Parts') {
     if (countBadge) countBadge.textContent = `${data.total_records} Students`;
 
     renderCreditsTable(data.students);
+
+    if (showToastMsg) {
+      showToast('Credits ledger refreshed!', 'success');
+    }
   } catch (err) {
     if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-6 text-center text-rose-500 font-semibold">Failed to load credits ledger.</td></tr>';
+    if (showToastMsg) showToast('Failed to refresh credits ledger.', 'error');
+  } finally {
+    if (icon) setTimeout(() => icon.classList.remove('animate-spin'), 400);
   }
 }
 
@@ -754,10 +841,12 @@ function downloadCreditsCsv() {
 
 // ================= VIEW 5: MEMBERS DIRECTORY =================
 
-async function loadMembersList() {
+async function loadMembersList(showToastMsg = false) {
   const tbody = document.getElementById('membersTableBody');
   const countBadge = document.getElementById('membersCountBadge');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-slate-400 italic">Loading choir members...</td></tr>';
+  const refreshBtn = document.getElementById('refreshMembersBtn');
+  const icon = refreshBtn?.querySelector('i');
+  if (icon) icon.classList.add('animate-spin');
 
   try {
     const res = await apiFetch(`${API_BASE}/students`);
@@ -765,10 +854,24 @@ async function loadMembersList() {
     const students = await res.json();
     state.allStudents = students;
 
+    // Sync with attendanceMap so new members can immediately be marked
+    students.forEach(s => {
+      if (!(s.reg_no in state.attendanceMap)) {
+        state.attendanceMap[s.reg_no] = false;
+      }
+    });
+
     if (countBadge) countBadge.textContent = `${students.length} Members`;
     renderMembersTable(students);
+
+    if (showToastMsg) {
+      showToast(`Members directory refreshed! ${students.length} members loaded.`, 'success');
+    }
   } catch (err) {
     if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-rose-500 font-semibold">Failed to load members list.</td></tr>';
+    if (showToastMsg) showToast('Failed to refresh members list.', 'error');
+  } finally {
+    if (icon) setTimeout(() => icon.classList.remove('animate-spin'), 400);
   }
 }
 
@@ -838,9 +941,13 @@ async function submitNewStudent(event) {
       return;
     }
 
-    showToast(`${name} added to ${part}!`);
+    showToast(`${name} added to ${part}! Directory & roster updated.`, 'success');
     document.getElementById('addStudentForm').reset();
-    loadMembersList();
+    
+    // Immediately reload directory and sync attendance roster!
+    await loadMembersList(false);
+    refreshMarkRoster(false);
+
   } catch (err) {
     console.error('Add member error:', err);
   }
@@ -860,8 +967,16 @@ async function confirmDeleteStudent(regNo, name) {
     }
 
     showToast(`${name} removed successfully.`);
-    loadMembersList();
+    await loadMembersList(false);
+    refreshMarkRoster(false);
   } catch (err) {
     console.error('Delete member error:', err);
   }
 }
+
+// Global Aliases
+window.bulkSetAttendance = markFiltered;
+window.submitAttendance = saveAttendance;
+window.refreshMarkRoster = refreshMarkRoster;
+window.setEventDuration = setEventDuration;
+window.updateEventTimeSummary = updateEventTimeSummary;

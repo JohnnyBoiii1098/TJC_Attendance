@@ -19,6 +19,7 @@ class EventBase(BaseModel):
     event_name: str = Field(..., description="Name/title of the rehearsal or service")
     event_date: datetime.date = Field(..., description="Date of the event")
     duration_hours: float = Field(2.0, ge=0.1, le=24.0, description="Duration in hours")
+    start_time: Optional[str] = Field("", description="Start time (e.g. 16:30 or 4:30 PM)")
 
 class EventCreate(EventBase):
     pass
@@ -35,6 +36,7 @@ class SaveAttendanceRequest(BaseModel):
     event_name: str
     event_date: datetime.date
     duration_hours: float = 2.0
+    start_time: Optional[str] = ""
     records: List[AttendanceRecord]
 
 class AttendanceRosterItem(BaseModel):

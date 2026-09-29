@@ -329,9 +329,14 @@
           <h3 class="font-bold text-lg text-tjcNavy flex items-center gap-2">
             <i data-lucide="clock" class="w-5 h-5 text-tjcGold"></i> Recent Recorded Events
           </h3>
-          <button onclick="switchTab('viewer')" class="text-xs font-semibold text-tjcNavy hover:underline">
-            View All &rarr;
-          </button>
+          <div class="flex items-center gap-2">
+            <button onclick="loadDashboardData(true)" class="p-1.5 rounded-lg text-slate-400 hover:text-tjcNavy hover:bg-slate-100 transition-colors" title="Refresh Dashboard & Recent Events">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+            <button onclick="switchTab('viewer')" class="text-xs font-semibold text-tjcNavy hover:underline">
+              View All &rarr;
+            </button>
+          </div>
         </div>
         <div id="recentEventsList" class="divide-y divide-slate-100">
           <p class="text-sm text-slate-400 py-3 italic">Loading recent sessions...</p>
@@ -358,39 +363,53 @@
 
       <!-- Event Config Card -->
       <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
-        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-500">Event Details</h3>
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold uppercase tracking-wider text-slate-500">Event Details & Time</h3>
+        </div>
         
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Event Name -->
           <div class="sm:col-span-2">
             <label class="block text-xs font-bold text-slate-700 mb-1">Event / Rehearsal Name *</label>
-            <input type="text" id="markEventName" placeholder="e.g. Sunday Mass Choir Practice" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy focus:border-transparent text-sm">
+            <input type="text" id="markEventName" placeholder="e.g. Sunday Mass Choir Practice" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy text-sm" required>
           </div>
 
-          <!-- Duration Hours -->
-          <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Duration (Hours) *</label>
-            <input type="number" id="markEventHours" value="2.0" step="0.5" min="0.5" max="24" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy focus:border-transparent text-sm">
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <!-- Event Date -->
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Date *</label>
-            <input type="date" id="markEventDate" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy focus:border-transparent text-sm">
+            <input type="date" id="markEventDate" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy text-sm" required>
           </div>
 
-          <!-- Session Shortcuts -->
+          <!-- Start Time (Clock) -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Quick Title Preset</label>
-            <select onchange="applyPresetTitle(this.value)" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy text-sm bg-white">
-              <option value="">Select a preset or type custom...</option>
-              <option value="Sunday Mass Choir Practice">Sunday Mass Choir Practice</option>
-              <option value="Weekday Rehearsal">Weekday Rehearsal</option>
-              <option value="Solemn Mass & Feast">Solemn Mass & Feast</option>
-              <option value="Annual Concert Rehearsal">Annual Concert Rehearsal</option>
-            </select>
+            <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+              <i data-lucide="clock" class="w-3.5 h-3.5 text-tjcGold"></i> Start Time (Clock) *
+            </label>
+            <input type="time" id="markEventTime" value="16:30" onchange="updateEventTimeSummary()" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy text-sm font-mono bg-white" title="Select time from when the event should be counted">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+          <!-- Duration Hours -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Duration (Hours) *</label>
+            <div class="flex items-center gap-2">
+              <input type="number" id="markEventHours" value="2.0" step="0.25" min="0.25" max="24" onchange="updateEventTimeSummary()" class="w-28 px-3.5 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy text-sm font-mono">
+              <div class="flex flex-wrap gap-1">
+                <button type="button" onclick="setEventDuration(1.0)" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">1h</button>
+                <button type="button" onclick="setEventDuration(1.5)" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">1.5h</button>
+                <button type="button" onclick="setEventDuration(2.0)" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">2h</button>
+                <button type="button" onclick="setEventDuration(2.5)" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">2.5h</button>
+                <button type="button" onclick="setEventDuration(3.0)" class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">3h</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Time Info Helper -->
+          <div class="flex items-center">
+            <p id="eventTimeSummary" class="text-xs text-slate-500 italic bg-slate-50 p-2.5 rounded-lg border border-slate-200 w-full">
+              Counted from <strong>16:30</strong> (2.0 hrs credit for attendees)
+            </p>
           </div>
         </div>
       </div>
@@ -399,10 +418,17 @@
       <div class="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-4">
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
           
-          <!-- Search box -->
-          <div class="relative w-full sm:w-72">
-            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-            <input type="text" id="markSearchInput" oninput="filterMarkRoster()" placeholder="Search name or reg no..." class="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy text-sm">
+          <!-- Search box & Refresh Roster Button -->
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <div class="relative w-full sm:w-72">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+              <input type="text" id="markSearchInput" oninput="filterMarkRoster()" placeholder="Search name or reg no..." class="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy text-sm">
+            </div>
+            <!-- Internal Refresh Button to immediately reflect newly added students -->
+            <button onclick="refreshMarkRoster(true)" id="refreshMarkRosterBtn" class="px-3 py-2 rounded-lg text-xs font-semibold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-tjcNavy flex items-center gap-1.5 transition-all shadow-sm shrink-0" title="Refresh student roster to reflect newly added members immediately">
+              <i data-lucide="refresh-cw" id="refreshRosterIcon" class="w-4 h-4 text-tjcNavy"></i>
+              <span class="hidden sm:inline">Refresh Roster</span>
+            </button>
           </div>
 
           <!-- Quick Toggle Buttons -->
@@ -425,7 +451,7 @@
 
       <!-- Students Attendance Roster List -->
       <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div id="markRosterContainer" class="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+        <div id="markRosterContainer" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
           <!-- Injected via JavaScript -->
         </div>
       </div>
@@ -436,7 +462,7 @@
           <p class="text-xs text-slate-500">Ready to record this session?</p>
           <p class="text-sm font-bold text-tjcNavy"><span id="saveBarCount">0</span> students recorded</p>
         </div>
-        <button onclick="submitAttendance()" class="px-6 py-2.5 rounded-lg bg-tjcNavy text-tjcGold font-bold text-sm hover:bg-tjcNavy-light shadow-md transition-all flex items-center gap-2">
+        <button onclick="saveAttendance()" class="px-6 py-2.5 rounded-lg bg-tjcNavy text-tjcGold font-bold text-sm hover:bg-tjcNavy-light shadow-md transition-all flex items-center gap-2">
           <i data-lucide="save" class="w-4 h-4"></i> Save Attendance
         </button>
       </div>
@@ -547,12 +573,18 @@
           </div>
         </div>
 
-        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
           <div class="relative w-full sm:w-72">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
             <input type="text" id="creditsSearchInput" oninput="filterCreditsTable()" placeholder="Search name or ID..." class="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-tjcNavy text-sm">
           </div>
-          <span id="creditsRecordCount" class="text-xs font-semibold text-slate-500">-- Students</span>
+          <div class="flex items-center gap-3">
+            <span id="creditsRecordCount" class="text-xs font-semibold text-slate-500">-- Students</span>
+            <button onclick="loadCreditsLedger(state.currentCreditsCategory, true)" id="refreshCreditsBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition-colors border border-slate-200 shadow-sm" title="Refresh credits calculation">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-tjcNavy"></i>
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -647,6 +679,10 @@
               <option value="Conductors">Conductors</option>
             </select>
             <input type="text" id="membersSearchInput" oninput="filterMembersList()" placeholder="Search name or ID..." class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-tjcNavy">
+            <button onclick="loadMembersList(true)" id="refreshMembersBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition-colors border border-slate-200 shadow-sm shrink-0" title="Refresh members list immediately">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-tjcNavy"></i>
+              <span>Refresh</span>
+            </button>
           </div>
         </div>
 

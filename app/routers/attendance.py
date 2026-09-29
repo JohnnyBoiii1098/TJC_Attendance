@@ -34,11 +34,11 @@ def save_attendance(
             # Insert the event
             cur.execute(
                 """
-                INSERT INTO events (event_name, event_date, duration_hours)
-                VALUES (%s, %s, %s)
+                INSERT INTO events (event_name, event_date, duration_hours, start_time)
+                VALUES (%s, %s, %s, %s)
                 RETURNING event_id;
                 """,
-                (clean_name, payload.event_date, payload.duration_hours)
+                (clean_name, payload.event_date, payload.duration_hours, (payload.start_time or "").strip())
             )
             event_id = cur.fetchone()[0]
 
@@ -59,6 +59,7 @@ def save_attendance(
                 "event_name": clean_name,
                 "event_date": str(payload.event_date),
                 "duration_hours": payload.duration_hours,
+                "start_time": (payload.start_time or "").strip(),
                 "total_records": len(payload.records),
                 "present_count": present_count,
                 "absent_count": absent_count,
@@ -75,7 +76,7 @@ def get_event_attendance(event_id: int):
     with get_db_cursor(dict_cursor=True) as cur:
         # Fetch event
         cur.execute(
-            "SELECT event_id, event_name, event_date, duration_hours FROM events WHERE event_id = %s",
+            "SELECT event_id, event_name, event_date, duration_hours, COALESCE(start_time, '') as start_time FROM events WHERE event_id = %s",
             (event_id,)
         )
         event_row = cur.fetchone()

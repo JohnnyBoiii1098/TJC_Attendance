@@ -12,7 +12,7 @@ def list_events(
     search: Optional[str] = Query(None, description="Search event name")
 ):
     """Retrieves recorded events, optionally filtered by date or name."""
-    query = "SELECT event_id, event_name, event_date, duration_hours FROM events WHERE 1=1"
+    query = "SELECT event_id, event_name, event_date, duration_hours, COALESCE(start_time, '') as start_time FROM events WHERE 1=1"
     params = []
 
     if date:
@@ -44,7 +44,7 @@ def list_event_dates():
 def get_event(event_id: int):
     """Retrieves an event by its ID."""
     with get_db_cursor(dict_cursor=True) as cur:
-        cur.execute("SELECT event_id, event_name, event_date, duration_hours FROM events WHERE event_id = %s", (event_id,))
+        cur.execute("SELECT event_id, event_name, event_date, duration_hours, COALESCE(start_time, '') as start_time FROM events WHERE event_id = %s", (event_id,))
         event = cur.fetchone()
         if not event:
             raise HTTPException(status_code=404, detail="Event not found.")

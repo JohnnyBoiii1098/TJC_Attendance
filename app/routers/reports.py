@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/reports", tags=["Reports"])
 def get_html_report(event_id: int):
     """Generates a clean, professional, and printable HTML report for an event."""
     with get_db_cursor(dict_cursor=True) as cur:
-        cur.execute("SELECT event_name, event_date, duration_hours FROM events WHERE event_id = %s", (event_id,))
+        cur.execute("SELECT event_name, event_date, duration_hours, COALESCE(start_time, '') as start_time FROM events WHERE event_id = %s", (event_id,))
         event = cur.fetchone()
         if not event:
             raise HTTPException(status_code=404, detail="Event not found.")
@@ -182,6 +182,7 @@ def get_html_report(event_id: int):
 
         <div class="meta-grid">
             <div class="meta-item"><span class="meta-label">Date:</span> <span>{event['event_date']}</span></div>
+            {"<div class='meta-item'><span class='meta-label'>Start Time:</span> <span>" + event['start_time'] + "</span></div>" if event.get('start_time') else ""}
             <div class="meta-item"><span class="meta-label">Duration:</span> <span>{event['duration_hours']} Hours</span></div>
             <div class="meta-item"><span class="meta-label">Present:</span> <span class="present">{present_count}</span></div>
             <div class="meta-item"><span class="meta-label">Absent:</span> <span class="absent">{absent_count}</span></div>
