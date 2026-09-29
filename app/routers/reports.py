@@ -32,18 +32,29 @@ def get_html_report(event_id: int):
     present_count = sum(1 for r in roster if r["is_present"])
     absent_count = len(roster) - present_count
 
+    # Filter to only display present students in the printable slip
+    present_roster = [r for r in roster if r["is_present"]]
+
     table_rows = ""
-    for r in roster:
-        status_class = "present" if r["is_present"] else "absent"
-        status_text = "Present" if r["is_present"] else "Absent"
-        table_rows += f"""
+    if not present_roster:
+        table_rows = """
         <tr>
-            <td class="font-bold">{r['student_name'].upper()}</td>
-            <td>{r['reg_no']}</td>
-            <td>{r['part']}</td>
-            <td class="{status_class}">{status_text}</td>
+            <td colspan="5" style="text-align: center; color: #6b7280; padding: 30px; font-style: italic;">
+                No members were recorded as present for this session.
+            </td>
         </tr>
         """
+    else:
+        for idx, r in enumerate(present_roster, start=1):
+            table_rows += f"""
+            <tr>
+                <td style="text-align: center; color: #6b7280; font-size: 13px;">{idx}</td>
+                <td class="font-bold">{r['student_name'].upper()}</td>
+                <td style="font-family: monospace; font-size: 13px;">{r['reg_no']}</td>
+                <td><span style="background: #f1f5f9; color: #334155; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">{r['part']}</span></td>
+                <td class="present">&#10003; Present</td>
+            </tr>
+            """
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -177,31 +188,36 @@ def get_html_report(event_id: int):
     <div class="report-card">
         <div class="header">
             <h1>The Josephite Choir</h1>
-            <h3>Event Attendance Roster: {event['event_name']}</h3>
+            <h3>Official Attendance Slip: {event['event_name']}</h3>
+            <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; font-style: italic;">List of Attendees Present</p>
         </div>
 
         <div class="meta-grid">
             <div class="meta-item"><span class="meta-label">Date:</span> <span>{event['event_date']}</span></div>
             {"<div class='meta-item'><span class='meta-label'>Start Time:</span> <span>" + event['start_time'] + "</span></div>" if event.get('start_time') else ""}
             <div class="meta-item"><span class="meta-label">Duration:</span> <span>{event['duration_hours']} Hours</span></div>
-            <div class="meta-item"><span class="meta-label">Present:</span> <span class="present">{present_count}</span></div>
-            <div class="meta-item"><span class="meta-label">Absent:</span> <span class="absent">{absent_count}</span></div>
-            <div class="meta-item"><span class="meta-label">Total Roster:</span> <span>{len(roster)}</span></div>
+            <div class="meta-item"><span class="meta-label">Attendees Present:</span> <span class="present" style="font-size: 15px;">{present_count}</span></div>
+            <div class="meta-item"><span class="meta-label">Total Choir Roster:</span> <span>{len(roster)}</span></div>
         </div>
 
         <table>
             <thead>
                 <tr>
+                    <th style="width: 40px; text-align: center;">#</th>
                     <th>Student Name</th>
                     <th>Registration ID</th>
-                    <th>Section</th>
-                    <th>Attendance Status</th>
+                    <th>Voice Section</th>
+                    <th>Status</th>
                 </tr>
             </thead>
             <tbody>
                 {table_rows}
             </tbody>
         </table>
+
+        <p style="font-size: 11px; color: #94a3b8; margin-top: 20px; font-style: italic; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
+            * Official attendance record: Only choir members marked present are listed above ({present_count} of {len(roster)} total members).
+        </p>
 
         <div class="actions">
             <button class="btn btn-print" onclick="window.print()">Print / Save as PDF</button>

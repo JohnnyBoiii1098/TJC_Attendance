@@ -49,3 +49,18 @@ def get_event(event_id: int):
         if not event:
             raise HTTPException(status_code=404, detail="Event not found.")
         return event
+
+@router.delete("/{event_id}", status_code=status.HTTP_200_OK)
+def delete_event(event_id: int):
+    """Deletes an event and all its associated attendance logs."""
+    with get_db_cursor(commit=True) as cur:
+        cur.execute("SELECT event_name FROM events WHERE event_id = %s", (event_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Event not found.")
+        
+        # Deleting event will CASCADE delete attendance_logs
+        cur.execute("DELETE FROM events WHERE event_id = %s", (event_id,))
+        
+    return {"success": True, "message": f"Event '{row[0]}' deleted successfully."}
+

@@ -313,9 +313,14 @@ async function loadDashboardData(showToastMsg = false) {
                   <p class="text-xs text-slate-500">${ev.event_date}${ev.start_time ? ' • Starts ' + ev.start_time : ''}</p>
                 </div>
               </div>
-              <button onclick="inspectEventFromDashboard(${ev.event_id}, '${ev.event_date}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-tjcNavy hover:text-tjcGold transition-colors flex items-center gap-1">
-                View Roster <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-              </button>
+              <div class="flex items-center gap-2">
+                <button onclick="inspectEventFromDashboard(${ev.event_id}, '${ev.event_date}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-tjcNavy hover:text-tjcGold transition-colors flex items-center gap-1">
+                  View Roster <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="confirmDeleteEventFromDashboard(${ev.event_id}, '${ev.event_name.replace(/'/g, "\\'")}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Delete Session">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
             </div>
           `).join('');
         }
@@ -739,6 +744,95 @@ function downloadEventCsv() {
   window.location.href = `${API_BASE}/reports/csv/${state.selectedEventId}${pinQuery}`;
 }
 
+async function confirmDeleteCurrentEvent() {
+  if (!state.selectedEventId) {
+    showToast('No event selected to delete.', 'error');
+    return;
+  }
+
+  const eventTitle = document.getElementById('viewerEventTitle')?.textContent || 'this event';
+  const eventDate = document.getElementById('viewerEventDate')?.textContent || '';
+
+  if (!confirm(`Are you sure you want to permanently delete "${eventTitle}" (${eventDate})?\n\nThis will remove all recorded attendance for this session. This action cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const res = await apiFetch(`${API_BASE}/events/${state.selectedEventId}`, {
+      method: 'DELETE'
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.detail || 'Failed to delete event.', 'error');
+      return;
+    }
+
+    showToast(`"${eventTitle}" was deleted successfully.`, 'success');
+
+    // Reset Day Viewer state
+    state.selectedEventId = null;
+    state.currentEventRoster = [];
+    hideViewerRoster();
+
+    // Reload event dropdown for current date
+    const dateInput = document.getElementById('viewerDateInput');
+    const dateVal = dateInput ? dateInput.value : '';
+    if (dateVal) {
+      await loadEventsForDate(dateVal);
+    }
+
+    // Refresh dashboard stats and recent events
+    await loadDashboardData(false);
+
+    // Refresh credits ledger if open
+    if (!document.getElementById('tab-credits')?.classList.contains('hidden')) {
+      await loadCreditsLedger(state.currentCreditsCategory, false);
+    }
+
+  } catch (err) {
+    console.error('Delete event error:', err);
+  }
+}
+
+async function confirmDeleteEventFromDashboard(eventId, eventName) {
+  if (!confirm(`Are you sure you want to delete "${eventName}"?\n\nThis will permanently remove all attendance logs for this session.`)) {
+    return;
+  }
+
+  try {
+    const res = await apiFetch(`${API_BASE}/events/${eventId}`, {
+      method: 'DELETE'
+    });
+
+    if (!res.ok) {
+      showToast('Failed to delete event.', 'error');
+      return;
+    }
+
+    showToast(`"${eventName}" deleted successfully.`, 'success');
+    await loadDashboardData(false);
+
+    // If currently selected in Day Viewer, reset it
+    if (state.selectedEventId === eventId) {
+      state.selectedEventId = null;
+      hideViewerRoster();
+      const dateInput = document.getElementById('viewerDateInput');
+      if (dateInput?.value) {
+        await loadEventsForDate(dateInput.value);
+      }
+    }
+
+    // Refresh credits ledger if active
+    if (!document.getElementById('tab-credits')?.classList.contains('hidden')) {
+      await loadCreditsLedger(state.currentCreditsCategory, false);
+    }
+  } catch (err) {
+    console.error('Delete event from dashboard error:', err);
+  }
+}
+
+
 // ================= VIEW 4: CREDITS LEDGER =================
 
 function initCreditsCategories() {
@@ -980,3 +1074,6 @@ window.submitAttendance = saveAttendance;
 window.refreshMarkRoster = refreshMarkRoster;
 window.setEventDuration = setEventDuration;
 window.updateEventTimeSummary = updateEventTimeSummary;
+window.confirmDeleteCurrentEvent = confirmDeleteCurrentEvent;
+window.confirmDeleteEventFromDashboard = confirmDeleteEventFromDashboard;
+
